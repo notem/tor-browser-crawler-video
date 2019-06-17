@@ -1,0 +1,20 @@
+# lines beginning with pound are ignored (like python)
+# this can be used for documentation
+
+# crawler works on youtube video links
+# here are some examples:
+http://www.youtube.com/watch?v=Zi4LMpSDccc
+http://www.youtube.com/watch?v=wmiIUN-7qhE
+http://www.youtube.com/watch?v=azvR__GRQic
+
+# some non-standard url forms are supported
+# urls are always reformatted into the standard youtube url format
+http://youtu.be/Raf9bVk75s8
+http://youtube.com/embed/gUTtJjV852c
+http://www.youtube-nocookie.com/v/4vWg5yJuWfs
+
+# video ID can also be used
+ruE75y1Jg_s
+-_DJEzZk2pc
+jNVZjNB8ptk
+
