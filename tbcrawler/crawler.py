@@ -4,6 +4,7 @@ from pprint import pformat
 from time import sleep, time
 
 from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.webdriver.common.by import By
 
 import tbcrawler.common as cm
 import tbcrawler.utils as ut
@@ -57,17 +58,13 @@ class VideoCrawler(object):
         for self.job.visit in xrange(self.job.visits):
             ut.create_dir(self.job.path)
             wl_log.info("*** Visit #%s to %s ***", self.job.visit, self.job.url)
+            self.job.screen_num = 0
             with self.driver.launch():
                 try:
                     self.driver.set_page_load_timeout(cm.SOFT_VISIT_TIMEOUT)
                 except WebDriverException as seto_exc:
                     wl_log.error("Setting soft timeout %s", seto_exc)
                 self._do_visit()
-                if self.screenshots:
-                    try:
-                        self.driver.get_screenshot_as_file(self.job.png_file)
-                    except WebDriverException:
-                        wl_log.error("Cannot get screenshot.")
             sleep(float(self.job.config['pause_between_loads']))
             self.post_visit()
 
@@ -76,31 +73,63 @@ class VideoCrawler(object):
                      device=self.device, dumpcap_log=self.job.pcap_log):
             sleep(1)  # make sure dumpcap is running
             try:
+                screenshot_count = 0
                 with ut.timeout(cm.HARD_VISIT_TIMEOUT):
+                    # begin loading page
                     self.driver.get(self.job.url)
+
+                    # take first screenshot
+                    if self.screenshots:
+                        try:
+                            self.driver.get_screenshot_as_file(self.job.png_file(screenshot_count))
+                            screenshot_count += 1
+                        except WebDriverException:
+                            wl_log.error("Cannot get screenshot.")
 
                     # check video player status
                     status_to_string = ['ended', 'played', 'paused', 'buffered', 'queued', 'unstarted']
                     js = "return document.getElementById('movie_player').getPlayerState()"
                     player_status = self.driver.execute_script(js)
 
-                    # wait until video finishes playing
+                    # continue visit capture until video is has fully played
                     ts = time()
                     while player_status != 0:
-                        # unpause video if state is unstarted or paused
+
+                        # attempt to simulate user skipping add
+                        if player_status == -1:
+                            try:
+                                skipAds = self.driver.find_elements(By.XPATH, "//button[@class=\"ytp-ad-skip-button ytp-button\"]")
+                                wl_log.info(len(skipAds))
+                                for skipAd in skipAds:
+                                    skipAd.click()
+                            except WebDriverException as e:
+                                pass
+
+                        # unpause video if state is unstarted or is for some reason paused
                         if player_status == -1 or player_status == 2:
                             self.driver.execute_script("return document.getElementById('movie_player').playVideo()")
-                        # wait before checking
+                            
+                        # busy loop delay
                         sleep(1)
+                        
                         # check video state again
                         new_ps = self.driver.execute_script(js)
+
+                        # print progress updates every time the video state changes
+                        # or on the screenshot interval
                         ts_new = time()
-                        # print progress updates
-                        if new_ps != player_status or ts_new - ts > 30.:
+                        if player_status != new_ps or ts_new - ts > cm.SCREENSHOT_INTERVAL:
                             wl_log.debug('youtube status: {} for {:.2f} seconds'
                                          .format(status_to_string[player_status], ts_new - ts))
                             ts = ts_new
-                        player_status = new_ps
+                            # take periodic screenshots
+                            if self.screenshots:
+                                try:
+                                    self.driver.get_screenshot_as_file(self.job.png_file(screenshot_count))
+                                    screenshot_count += 1
+                                except WebDriverException:
+                                    wl_log.error("Cannot get screenshot.")
+                            player_status = new_ps
 
             except (cm.HardTimeoutException, TimeoutException):
                 wl_log.error("Visit to %s reached hard timeout!", self.job.url)
@@ -129,10 +158,6 @@ class CrawlJob(object):
         return join(self.path, "dump.log")
 
     @property
-    def png_file(self):
-        return join(self.path, "screenshot.png")
-
-    @property
     def instance(self):
         return self.batch * self.visits + self.visit
 
@@ -144,6 +169,9 @@ class CrawlJob(object):
     def path(self):
         attributes = [self.batch, self.site, self.instance]
         return join(cm.CRAWL_DIR, "_".join(map(str, attributes)))
+
+    def png_file(self, time):
+        return join(self.path, "screenshot_{}.png".format(time))
 
     def __repr__(self):
         return "Batches: %s, Sites: %s, Visits: %s" \

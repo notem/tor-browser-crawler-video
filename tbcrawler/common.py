@@ -18,6 +18,9 @@ STREAM_CLOSE_TIMEOUT = 20  # wait 20 seconds before raising an alarm signal
 SOFT_VISIT_TIMEOUT = 120     # timeout used by selenium when attempting to load the page (before loading video)
 HARD_VISIT_TIMEOUT = 60*20   # hard timeout used by process and dumpcap to terminate irregardless of video load status
 
+# write youtube player status and take screenshots every so often
+SCREENSHOT_INTERVAL = 30.      # in seconds
+
 DEFAULT_SOCKS_PORT = 9051
 
 # virtual display dimensions

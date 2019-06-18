@@ -11,6 +11,7 @@ from sys import maxsize, argv
 from urlparse import urlparse
 import re
 
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from tbselenium.tbdriver import TorBrowserDriver
 from tbselenium.common import USE_RUNNING_TOR
 from tbselenium.utils import start_xvfb, stop_xvfb
@@ -242,7 +243,9 @@ class TorBrowserWrapper(object):
 
     @contextmanager
     def launch(self):
-        self.driver = TorBrowserDriver(*self.args, **self.kwargs)
+        caps = DesiredCapabilities().FIREFOX
+        caps['pageLoadStrategy'] = 'eager'
+        self.driver = TorBrowserDriver(*self.args, capabilities=caps, **self.kwargs)
         yield self.driver
         self.driver.quit()
 
